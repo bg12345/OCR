@@ -2,6 +2,9 @@ import math
 from typing import Tuple, Union
 import numpy as np
 import cv2
+from nostril import nonsense
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 from deskew import determine_skew
 from pyzbar.pyzbar import decode,ZBarSymbol
 
@@ -19,20 +22,16 @@ def rotate(image: np.ndarray, angle: float, background: Union[int, Tuple[int, in
 
 
 def get_preprocessed_file(path,file):
-    if file!=None:
-      file = np.fromstring(file.read(), np.uint8)
-      file = cv2.imdecode(file, cv2.IMREAD_ANYCOLOR)
+    if file != None:
+        file = np.fromstring(file.read(), np.uint8)
+        file = cv2.imdecode(file, cv2.IMREAD_ANYCOLOR)
     else:
-        file=cv2.imread(path)
+        file = cv2.imread(path)
     angle = determine_skew(cv2.cvtColor(file, cv2.COLOR_BGR2GRAY))
-    #print(angle)
     if angle != 0.0:
         file = rotate(file, angle, (0, 0, 0))
     file = cv2.resize(file, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_CUBIC)
     file = cv2.fastNlMeansDenoisingColored(file, None, 10, 10, 7, 15)
-    """cv2.imshow("test",file)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()"""
     return file
 
 
@@ -43,3 +42,16 @@ def detection(path):
     if d:
         return d[0]
     return False
+
+def remove_nonsense(x):
+    try:
+        if nonsense(x):
+            return False
+        return True
+    except:
+        return False
+
+def get_preprocessed_txt(txt):
+    stop_words = set(stopwords.words('english'))
+    word_tokens = word_tokenize(txt)
+    return " ".join(w for w in word_tokens if not w.lower() in stop_words)

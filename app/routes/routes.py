@@ -4,18 +4,22 @@ from PDFTextExtract import get_pdf_images
 from PIL import Image
 from io import BytesIO
 from flask_cors import cross_origin
-from preprocessing import get_preprocessed_file, detection
+from werkzeug.utils import secure_filename
+from preprocessing import get_preprocessed_file, detection,remove_nonsense,get_preprocessed_txt
 from datetime import date
 from pyaadhaar.decode import AadhaarSecureQr,AadhaarOldQr
 from collections import OrderedDict
-from app import app
+from app import app, mongo, s3
+from dotenv import load_dotenv
+from secrets import token_hex
 
+load_dotenv()
 
 suffixes = ("pdf", "jpeg", "png", "jpg")
 address=os.getcwd()+"/doc_files/"
-pytesseract.pytesseract.tesseract_cmd=r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-poppler_path = r"C:\Users\Sameer.DESKTOP-E7MGQPO\Downloads\Release-21.09.0-1\poppler-21.09.0\Library\bin"
-url="http://127.0.0.1:5000/doc_files/{}/"
+pytesseract.pytesseract.tesseract_cmd=os.getenv("TESSERACT_PATH")
+url = "https://{}.s3.{}.amazonaws.com/{}/{}"
+region=s3.get_bucket_location(Bucket=os.getenv('AWS_BUCKET_NAME'))['LocationConstraint']
 
 @app.route("/")
 @cross_origin()
@@ -27,57 +31,73 @@ def index():
 @cross_origin()
 def pan_ocr():
     if request.method=="POST":
-        file=request.files["file"]
-        suffix = file.filename.split(".")[1].lower()
-        temp_path = os.path.join(address + "pan/", "temp."+suffix)
-        file.save(temp_path)
-        keywords="INCOME TAX DEPARTMENT GOVT. INDIA".split()
-        if suffix in suffixes:
-            if suffix == "pdf":
-                imgs = get_pdf_images(file)
-                if len(imgs)==1:
-                   (mode, size, data) = imgs[0]
-                   file = BytesIO(data)
-            else:
-                   file=None
-            file = get_preprocessed_file(path=temp_path, file=file)
-            txt = pytesseract.image_to_string(file, lang="eng+hin")
-            names = list(filter(lambda x:len(x)>2 and not any(i in x for i in keywords),re.findall(r"\b[A-Z\.]+(?:[ \r\t\f]+[A-Z\.]+)*\b", txt)))
-            if len(names)>1:
-                customer_name=names[0]
-                father_name=names[1]
-                pan_type="Individual"
-                if re.search(customer_name,txt).end()+1==re.search(father_name,txt).start():
-                    customer_name+=" "+father_name
-                    try:
-                        father_name=names[2]
-                    except:
-                        father_name=None
-                        pan_type="Business"
-            else:
-                customer_name=names[0]
-                father_name=None
-                pan_type="Business"
-            try:
-                pan_no = re.search(r"[A-Z]{5}[0-9oO]{4}[A-Z]", txt,flags=re.IGNORECASE).group(0).upper()
-                num = re.search(r"[0-9oO]{4}", pan_no).group(0)
-                if "o" in num or "O" in num:
-                    pan_no = pan_no.replace(num, num.replace("o", "0").replace("O", "0"))
-            except:
-                pan_no = None
-            try:
-                dob = re.search(r"(\d+/\d+/\d+)", txt).group(0)
-            except:
-                dob = None
-            filename = customer_name.split()[0]+"_"+pan_no+ "." + suffix
-            path = os.path.join(address + "pan/", filename)
-            if not os.path.exists(path) and os.path.exists(temp_path):
-                os.rename(temp_path,path)
-            data={"name":customer_name,"father_name":father_name,"pan_number":pan_no,
-                  "pan_type":pan_type,"date_of_birth_or_registration":dob,"page_count":1,
-                  "file_path":url.format("pan")+filename,"file_type":suffix}
-            return jsonify(data)
-        return "Please submit valid file", 201
+        try:
+            file=request.files["file"]
+            suffix = file.filename.split(".")[1].lower()
+            temp_filename = f"PAN_{token_hex(8)}.{suffix}"
+            content_type=file.content_type
+            file.save(temp_filename)
+            keywords="INCOME TAX DEPARTMENT GOVT. INDIA".split()
+            if suffix in suffixes:
+                if suffix == "pdf":
+                    imgs = get_pdf_images(file)
+                    if len(imgs) == 1:
+                        (mode, size, data) = imgs[0]
+                        file = BytesIO(data)
+                else:
+                    file=None
+                processed_file = get_preprocessed_file(temp_filename,file)
+                txt = get_preprocessed_txt(pytesseract.image_to_string(processed_file, lang="eng+hin"))
+                try:
+                    pan_no = re.search(r"[A-Z]{5}[0-9oO]{4}[A-Z]", txt,flags=re.IGNORECASE).group(0).upper()
+                    num = re.search(r"[0-9oO]{4}", pan_no).group(0)
+                    if "o" in num or "O" in num:
+                        pan_no = pan_no.replace(num, num.replace("o", "0").replace("O", "0"))
+                except:
+                    pan_no = None
+                if pan_no:
+                    existing_pan=mongo.db.pan.find_one({"pan_number":pan_no})
+                    if existing_pan:
+                        existing_pan["_id"]=str(existing_pan["_id"])
+                        if os.path.exists(temp_filename):
+                            os.remove(temp_filename)
+                        return jsonify(existing_pan)
+                names = list(filter(lambda x:len(x)>2 and not any(i in x for i in keywords),re.findall(r"\b[A-Z\.]+(?:[ \r\t\f]+[A-Z\.]+)*\b", txt)))
+                names=list(filter(remove_nonsense,names))
+                if len(names)>1:
+                    customer_name=names[0]
+                    father_name=names[1]
+                    pan_type="Individual"
+                    if re.search(customer_name,txt).end()+1==re.search(father_name,txt).start():
+                        customer_name+=" "+father_name
+                        try:
+                            father_name=names[2]
+                        except:
+                            father_name=None
+                            pan_type="Business"
+                else:
+                    customer_name=names[0]
+                    father_name=None
+                    pan_type="Business"
+                try:
+                    dob = re.search(r"(\d+/\d+/\d+)", txt).group(0)
+                except:
+                    dob = None
+                filename = secure_filename(customer_name.split()[0]+"_"+pan_no+ "." + suffix)
+                s3.upload_file(temp_filename,os.getenv("AWS_BUCKET_NAME"),f"pan/{filename}",ExtraArgs={
+                    "ACL":"public-read","ContentType":content_type
+                })
+                if os.path.exists(temp_filename):
+                    os.remove(temp_filename)
+                data={"name":customer_name,"father_name":father_name,"pan_number":pan_no,
+                      "pan_type":pan_type,"date_of_birth_or_registration":dob,
+                      "url":url.format(os.getenv('AWS_BUCKET_NAME'),region,"pan",filename)}
+                mongo.db.pan.insert_one(data)
+                data["_id"]=str(data["_id"])
+                return jsonify(data)
+            return jsonify(message="Please submit valid file"), 415
+        except:
+            return jsonify(message="Something went wrong"),500
 
 @app.route("/dl_ocr",methods=["POST"])
 @cross_origin()
@@ -185,7 +205,7 @@ def aadhaar_ocr():
                             img = Image.open(back_file)
                             img.save(back_bytesio_path)
                     except:
-                          img = pdf2image.convert_from_path(pdf_path=front_temp_path,poppler_path=poppler_path)
+                          img = pdf2image.convert_from_path(pdf_path=front_temp_path,poppler_path=os.getenv("POPPLER_PATH"))
                           img[0].save(front_bytesio_path)
                           if len(img)==2:
                               img[1].save(back_bytesio_path)
