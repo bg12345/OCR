@@ -21,12 +21,16 @@ def rotate(image: np.ndarray, angle: float, background: Union[int, Tuple[int, in
     return cv2.warpAffine(image, rot_mat, (int(round(height)), int(round(width))), borderValue=background)
 
 
-def get_preprocessed_file(path,file):
-    if file != None:
-        file = np.fromstring(file.read(), np.uint8)
-        file = cv2.imdecode(file, cv2.IMREAD_ANYCOLOR)
-    else:
-        file = cv2.imread(path)
+def read_image(source, flags=cv2.IMREAD_ANYCOLOR):
+    if hasattr(source, "read"):
+        source.seek(0)
+        data = np.frombuffer(source.read(), np.uint8)
+        return cv2.imdecode(data, flags)
+    return cv2.imread(source, flags)
+
+
+def get_preprocessed_file(path=None,file=None):
+    file = read_image(file if file is not None else path)
     angle = determine_skew(cv2.cvtColor(file, cv2.COLOR_BGR2GRAY))
     if angle != 0.0:
         file = rotate(file, angle, (0, 0, 0))
@@ -35,8 +39,8 @@ def get_preprocessed_file(path,file):
     return file
 
 
-def detection(path):
-    im = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+def detection(source):
+    im = read_image(source, cv2.IMREAD_GRAYSCALE)
     ret, bw_im = cv2.threshold(im, 127, 255, cv2.THRESH_BINARY)
     d = decode(bw_im,symbols=[ZBarSymbol.QRCODE])
     if d:

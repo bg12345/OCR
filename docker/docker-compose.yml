@@ -1,0 +1,12 @@
+services:
+  ocr-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - ../.env
+    environment:
+      TESSERACT_PATH: /usr/bin/tesseract
+      POPPLER_PATH: /usr/bin
+    ports:
+      - "5000:5000"
