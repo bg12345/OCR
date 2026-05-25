@@ -55,6 +55,10 @@ AWS_BUCKET_NAME=your_bucket_name
 
 TESSERACT_PATH=/usr/bin/tesseract
 POPPLER_PATH=/usr/bin
+
+MAX_UPLOAD_MB=10
+RATE_LIMIT_REQUESTS=20
+RATE_LIMIT_WINDOW_SECONDS=60
 ```
 
 If you use temporary AWS credentials, also set:
@@ -240,5 +244,8 @@ X-Amz-Expires=600
 ## Notes
 
 - Do not commit `.env`; it contains AWS and database credentials.
+- The browser UI is intended for demo/sample files only. Do not upload real identity documents to a public demo deployment.
+- Uploads are capped by `MAX_UPLOAD_MB`, which defaults to `10`.
+- OCR endpoints are rate limited in memory with `RATE_LIMIT_REQUESTS` per `RATE_LIMIT_WINDOW_SECONDS` per client IP. Defaults are `20` requests per `60` seconds.
 - If S3 presigned URLs fail with `SignatureDoesNotMatch`, verify `AWS_ACCESS_KEY`, `AWS_ACCESS_SECRET`, `AWS_SESSION_TOKEN`, `AWS_REGION`, and system clock.
 - OCR accuracy depends heavily on document quality, lighting, orientation, and scan resolution.

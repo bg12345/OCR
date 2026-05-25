@@ -80,6 +80,16 @@ h2 {
   white-space: nowrap;
 }
 
+.demo-note {
+  margin-bottom: 18px;
+  border: 1px solid #d7c57a;
+  border-radius: 8px;
+  background: #fff8d8;
+  color: #5d4c11;
+  padding: 12px 14px;
+  line-height: 1.45;
+}
+
 .workspace,
 .result {
   background: var(--panel);
