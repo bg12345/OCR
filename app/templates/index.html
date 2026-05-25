@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OCR API Demo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <main class="shell">
+    <section class="intro">
+      <div>
+        <p class="eyebrow">OCR API Demo</p>
+        <h1>Document OCR Workbench</h1>
+        <p class="subtle">Upload PAN, Aadhaar, or driving licence files and inspect the extracted API response.</p>
+      </div>
+      <div class="status-pill">Private S3 + 10 min links</div>
+    </section>
+
+    <section class="workspace">
+      <aside class="tabs" aria-label="Document type">
+        <button class="tab active" data-panel="pan">PAN</button>
+        <button class="tab" data-panel="aadhaar">Aadhaar</button>
+        <button class="tab" data-panel="dl">Driving Licence</button>
+      </aside>
+
+      <section class="panel active" id="panel-pan">
+        <form class="ocr-form" data-endpoint="/pan_ocr" data-kind="single">
+          <div class="field">
+            <label for="pan-file">PAN file</label>
+            <input id="pan-file" name="file" type="file" accept=".pdf,.jpeg,.jpg,.png" required>
+          </div>
+          <button type="submit">Run PAN OCR</button>
+        </form>
+      </section>
+
+      <section class="panel" id="panel-aadhaar">
+        <form class="ocr-form" data-endpoint="/aadhaar_ocr" data-kind="aadhaar">
+          <div class="field">
+            <label for="aadhaar-front">Front file</label>
+            <input id="aadhaar-front" name="front_file" type="file" accept=".pdf,.jpeg,.jpg,.png" required>
+          </div>
+          <div class="field">
+            <label for="aadhaar-back">Back file</label>
+            <input id="aadhaar-back" name="back_file" type="file" accept=".pdf,.jpeg,.jpg,.png">
+          </div>
+          <button type="submit">Run Aadhaar OCR</button>
+        </form>
+      </section>
+
+      <section class="panel" id="panel-dl">
+        <form class="ocr-form" data-endpoint="/dl_ocr" data-kind="single">
+          <div class="field">
+            <label for="dl-file">Driving licence file</label>
+            <input id="dl-file" name="file" type="file" accept=".pdf,.jpeg,.jpg,.png" required>
+          </div>
+          <button type="submit">Run DL OCR</button>
+        </form>
+      </section>
+    </section>
+
+    <section class="result">
+      <div class="result-header">
+        <h2>Result</h2>
+        <button id="copy-result" type="button">Copy JSON</button>
+      </div>
+      <div id="links" class="links"></div>
+      <pre id="output">No request yet.</pre>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

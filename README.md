@@ -12,6 +12,7 @@ Uploaded files are processed in memory with `BytesIO`, uploaded privately to S3,
 
 ## Features
 
+- Browser demo UI for uploading documents and viewing extracted JSON.
 - OCR with Tesseract for English and Hindi text.
 - PDF image extraction with Poppler.
 - Aadhaar QR decoding with `pyaadhaar`.
@@ -84,6 +85,8 @@ The API will be available at:
 ```txt
 http://localhost:5000
 ```
+
+Open this URL in a browser to use the demo UI.
 
 The Docker image includes:
 
@@ -165,13 +168,7 @@ python run.py
 GET /
 ```
 
-Response:
-
-```json
-{
-  "message": "API Documentation"
-}
-```
+Serves the browser demo UI for PAN, Aadhaar, and driving licence uploads.
 
 ### PAN OCR
 

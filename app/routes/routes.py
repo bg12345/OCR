@@ -1,5 +1,5 @@
 import pytesseract,re,pdf2image,os,traceback,cv2
-from flask import request, jsonify
+from flask import request, jsonify, render_template
 from PDFTextExtract import get_pdf_images
 from PIL import Image
 from io import BytesIO
@@ -106,7 +106,7 @@ def error_response(message, status):
 @app.route("/")
 @cross_origin()
 def index():
-    return json_response({"message": "API Documentation"})
+    return render_template("index.html")
 
 
 @app.route("/pan_ocr",methods=["POST"])
